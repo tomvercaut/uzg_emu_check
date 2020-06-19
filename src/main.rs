@@ -63,7 +63,10 @@ fn main() {
     }
     let expected_mu = res_mu.unwrap();
     println!("Expected MUs: {}", expected_mu);
-    println!("Difference [%]: {}", (1.0-expected_mu/beam_state.planned_mu)*100.0);
+    println!(
+        "Difference [%]: {}",
+        (1.0 - expected_mu / beam_state.planned_mu) * 100.0
+    );
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -493,10 +496,15 @@ pub(crate) fn interpolate_output_factor(
     return Ok(y);
 }
 
-pub(crate) fn compute_expected_mu(of_table: &OFTable, beam_state: &BeamState) -> Result<f64, EmuError> {
+pub(crate) fn compute_expected_mu(
+    of_table: &OFTable,
+    beam_state: &BeamState,
+) -> Result<f64, EmuError> {
     let output_factor = interpolate_output_factor(of_table, &beam_state)?;
-    let r = beam_state.d2/beam_state.prescription_dose;
-    Ok(beam_state.prescription_dose * beam_state.ssd * beam_state.ssd / (beam_state.ssd_ref * beam_state.ssd_ref) * r / output_factor)
+    let r = beam_state.d2 / beam_state.prescription_dose;
+    let inv_square = beam_state.ssd * beam_state.ssd / (beam_state.ssd_ref * beam_state.ssd_ref);
+    let mu = beam_state.prescription_dose * inv_square * r / output_factor;
+    Ok(mu)
 }
 
 #[cfg(test)]
@@ -561,11 +569,11 @@ mod test {
         let of_table = build_8mev_6x6_of_tabel();
         let mut bs = BeamState::new();
         bs.prescription_dose = 800.0;
-        bs.ssd_ref=95.0;
-        bs.ssd=98.85;
-        bs.planned_mu=1030.86;
-        bs.energy=8.0;
-        bs.d2=8.78666666666667;
+        bs.ssd_ref = 95.0;
+        bs.ssd = 98.85;
+        bs.planned_mu = 1030.86;
+        bs.energy = 8.0;
+        bs.d2 = 878.666666666667;
         let res_mu = compute_expected_mu(&of_table, &bs);
         assert!(res_mu.is_ok());
         let mu = res_mu.unwrap();
