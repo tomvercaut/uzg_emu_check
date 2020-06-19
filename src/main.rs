@@ -56,6 +56,14 @@ fn main() {
     of_table.sort();
     println!("Selected outputfactor table:");
     println!("{}", of_table);
+    let res_mu = compute_expected_mu(&of_table, &beam_state);
+    if let Err(e) = res_mu {
+        eprintln!("{}", e.to_string());
+        exit(1);
+    }
+    let expected_mu = res_mu.unwrap();
+    println!("Expected MUs: {}", expected_mu);
+    println!("Difference [%]: {}", (1.0-expected_mu/beam_state.planned_mu)*100.0);
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -135,8 +143,13 @@ pub(crate) fn filter_of_tables(tables: &OFTables, state: &BeamState) -> Result<O
 }
 
 pub(crate) fn interpolate_linear(x: f64, x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
+    // println!("x: {}", x);
+    // println!("x0: {}", x0);
+    // println!("x1: {}", x1);
+    // println!("y0: {}", y0);
+    // println!("y1: {}", y1);
     let dx = x1 - x0;
-    if dx == 0.0 {
+    if dx <= std::f64::EPSILON {
         return y0;
     }
     y0 + (x - x0) * (y1 - y0) / dx
@@ -434,23 +447,129 @@ pub(crate) fn build_of_tables(v: &Vec<Vec<String>>) -> Result<OFTables, EmuError
 }
 
 /// Interpolate the output factor in function of the SSD
-/// The output factor table must be sorted by SSD prior to calling the function.
 pub(crate) fn interpolate_output_factor(
     of_table: &OFTable,
     state: &BeamState,
 ) -> Result<f64, EmuError> {
-    let min_ssd = of_table.table.get(0).unwrap().0;
-    let max_ssd = of_table.table.get(of_table.table.len() - 1).unwrap().0;
+    let mut min_ssd = std::f64::MAX;
+    let mut max_ssd = std::f64::MIN;
+    let mut mi = std::usize::MAX;
+    let mut mj = std::usize::MAX;
+    let mut di = std::f64::MAX;
+    let mut da = std::f64::MAX;
+    for (i, p) in of_table.table.iter().enumerate() {
+        if p.0 < min_ssd {
+            min_ssd = p.0;
+        }
+        if p.0 > max_ssd {
+            max_ssd = p.0;
+        }
+        let delta = (p.0 - state.ssd).abs();
+        if p.0 <= state.ssd && delta < di {
+            mi = i;
+            di = delta;
+        }
+        if p.0 >= state.ssd && delta < da {
+            mj = i;
+            da = delta;
+        }
+    }
     if state.ssd < min_ssd || state.ssd > max_ssd {
         return Err(EmuError::Str(format!(
             "Requested SSD [{}] is outside of the boundaries of the output factor table: [{},{}]",
             state.ssd, min_ssd, max_ssd
         )));
     }
-    let mut mi = std::f64::MAX;
-    let mut ma = std::f64::MIN;
-    for p in &of_table.table {
-        //TODO continue here
+    if mi == mj {
+        return Ok(of_table.table.get(mi).unwrap().1);
     }
-    unimplemented!()
+    let y = interpolate_linear(
+        state.ssd,
+        of_table.table.get(mi).unwrap().0,
+        of_table.table.get(mj).unwrap().0,
+        of_table.table.get(mi).unwrap().1,
+        of_table.table.get(mj).unwrap().1,
+    );
+    return Ok(y);
+}
+
+pub(crate) fn compute_expected_mu(of_table: &OFTable, beam_state: &BeamState) -> Result<f64, EmuError> {
+    let output_factor = interpolate_output_factor(of_table, &beam_state)?;
+    let r = beam_state.d2/beam_state.prescription_dose;
+    Ok(beam_state.prescription_dose * beam_state.ssd * beam_state.ssd / (beam_state.ssd_ref * beam_state.ssd_ref) * r / output_factor)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn build_one_of_table() -> OFTable {
+        let mut of_table = OFTable::new();
+        of_table.table.push((115.0, 0.442));
+        of_table.table.push((95.5, 0.856));
+        of_table.table.push((100.0, 0.736));
+        of_table.table.push((98.0, 0.792));
+        of_table.table.push((110.0, 0.526));
+        of_table.table.push((105.0, 0.619));
+        of_table.table.push((95.0, 0.865));
+        of_table
+    }
+
+    fn build_8mev_6x6_of_tabel() -> OFTable {
+        let mut of_table = OFTable::new();
+        of_table.table.push((115.0, 0.584));
+        of_table.table.push((95.5, 0.986));
+        of_table.table.push((100.0, 0.865));
+        of_table.table.push((98.0, 0.919));
+        of_table.table.push((110.0, 0.663));
+        of_table.table.push((105.0, 0.753));
+        of_table.table.push((95.0, 0.994));
+        of_table
+    }
+
+    #[test]
+    fn test_interpolate_output_factor() {
+        let of_table = build_one_of_table();
+        let mut bs = BeamState::new();
+        // test exact matches
+        bs.ssd = 98.0;
+        let res_of1 = interpolate_output_factor(&of_table, &bs);
+        assert!(res_of1.is_ok());
+        assert_eq!(res_of1.unwrap(), 0.792);
+        // test min and max boundaries
+        bs.ssd = 94.9;
+        let res_of2 = interpolate_output_factor(&of_table, &bs);
+        assert!(res_of2.is_err());
+        bs.ssd = 115.1;
+        let res_of3 = interpolate_output_factor(&of_table, &bs);
+        assert!(res_of3.is_err());
+
+        // test interpolation
+        bs.ssd = 106.0;
+        let res_of4 = interpolate_output_factor(&of_table, &bs);
+        assert!(res_of4.is_ok());
+        assert!((res_of4.unwrap() - 0.6004).abs() < std::f64::EPSILON);
+
+        bs.ssd = 109.9;
+        let res_of5 = interpolate_output_factor(&of_table, &bs);
+        assert!(res_of5.is_ok());
+        assert!((res_of5.unwrap() - 0.52786) < std::f64::EPSILON);
+    }
+
+    #[test]
+    fn test_compute_mu1() {
+        let of_table = build_8mev_6x6_of_tabel();
+        let mut bs = BeamState::new();
+        bs.prescription_dose = 800.0;
+        bs.ssd_ref=95.0;
+        bs.ssd=98.85;
+        bs.planned_mu=1030.86;
+        bs.energy=8.0;
+        bs.d2=8.78666666666667;
+        let res_mu = compute_expected_mu(&of_table, &bs);
+        assert!(res_mu.is_ok());
+        let mu = res_mu.unwrap();
+        println!("mu: {}", mu);
+        assert!((mu - 1065.79432986395).abs() < std::f64::EPSILON);
+    }
 }
