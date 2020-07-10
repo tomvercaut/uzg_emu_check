@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::io::Error;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EmuError {
@@ -12,6 +14,8 @@ pub enum EmuError {
     Logic(String),
     Str(String),
     Format(String),
+    DirNotFound(PathBuf),
+    IO(String),
 }
 
 impl std::fmt::Display for EmuError {
@@ -29,6 +33,16 @@ impl std::fmt::Display for EmuError {
             EmuError::Logic(msg) => write!(f, "{}", msg),
             EmuError::Str(msg) => write!(f, "{}", msg),
             EmuError::Format(msg) => write!(f, "Invalid format: {}", msg),
+            EmuError::DirNotFound(path_buf) => {
+                write!(f, "Directory not found or does not exist: {:#?}", path_buf)
+            }
+            EmuError::IO(msg) => write!(f, "Input / output error: {}", msg),
         }
+    }
+}
+
+impl std::convert::From<std::io::Error> for EmuError {
+    fn from(e: Error) -> Self {
+        Self::Str(e.to_string())
     }
 }

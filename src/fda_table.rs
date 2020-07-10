@@ -1,5 +1,6 @@
 use crate::errors::EmuError;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FdaTable {
@@ -97,6 +98,80 @@ impl FdaTable {
         let cf = opt_cf.unwrap();
         Ok(*cf)
     }
+}
+
+pub fn read_fda_table(path_buf: PathBuf) -> Result<(String, String, FdaTable), EmuError> {
+    let mut fda_table = FdaTable::new();
+    let mut machine = "".to_owned();
+    let mut applicator = "".to_owned();
+    let res_rdr = csv::ReaderBuilder::new().has_headers(false).from_path(path_buf);
+    if let Err(e) = res_rdr {
+        return Err(EmuError::IO(e.to_string()));
+    }
+    let mut rdr = res_rdr.unwrap();
+    let mut nc = 0;
+    let mut i = 0;
+    for record in rdr.records() {
+        if let Err(e) = record {
+            return Err(EmuError::IO(e.to_string()));
+        }
+        let record = record.unwrap();
+        let nrecord = record.len();
+        if nrecord == 0 {
+            continue;
+        }
+        if nc == 0 {
+            nc = nrecord;
+        }
+        if nc != nrecord {
+            return Err(EmuError::Format(format!("All rows in the CSV file must have the same number of columns [{} <-> {}]", nc, nrecord)));
+        }
+        if i == 0 {
+            machine = record[0].to_string();
+        } else if i == 1 {
+            if &record[0] != "Applicator" {
+                return Err(EmuError::Format("Expected the label \'Applicator\' on row 1, column 0".to_owned()));
+            }
+            applicator = record[1].to_string();
+        } else if i == 2 {
+            if &record[0] != "Dimensions" {
+                return Err(EmuError::Format("Expected the label \'Dimensions\' on row 2, column 0".to_owned()));
+            }
+            if &record[1] != "id" {
+                return Err(EmuError::Format("Expected the label \'id\' on row 2, column 1".to_owned()));
+            }
+            let mut energies = Vec::with_capacity(nrecord - 1);
+            for j in 1..nrecord {
+                let s = &record[j];
+                let res_f = s.parse::<f64>();
+                if let Err(e) = res_f {
+                    return Err(EmuError::Format(e.to_string()));
+                }
+                energies.push(res_f.unwrap());
+            }
+            fda_table.energies = energies;
+        }
+        else {
+            let name = &record[0];
+            let sid = &record[1];
+            let res_id = sid.parse::<usize>();
+            if let Err(e) = res_id {
+                return Err(EmuError::Format(e.to_string()));
+            }
+            let mut v = vec![];
+            for j in 2..nrecord {
+                let s = &record[j];
+                let res_f = s.parse::<f64>();
+                if let Err(e) = res_f{
+                    return Err(EmuError::Format(e.to_string()));
+                }
+                v.push(res_f.unwrap());
+            }
+            fda_table.add(name, res_id.unwrap(), v)?;
+        }
+        i = i +1;
+    }
+    Ok((machine, applicator, fda_table))
 }
 
 #[cfg(test)]

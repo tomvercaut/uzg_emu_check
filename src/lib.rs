@@ -1,13 +1,15 @@
+#![allow(dead_code)]
 mod correction_data;
 mod errors;
 pub use errors::*;
 mod fda_table;
+pub use fda_table::*;
 mod ipol;
 mod of_table;
+pub use of_table::*;
 
 use console::Term;
-use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
+use std::path::PathBuf;
 
 pub fn question(term: &Term, msg: &str) -> Result<String, EmuError> {
     if let Err(e) = term.write_str(&format!("{}: ", msg)) {
@@ -43,8 +45,7 @@ pub fn question_with_options<T: std::fmt::Display>(
     msg: &str,
     options: &Vec<T>,
 ) -> Result<usize, EmuError> {
-    let mut work = true;
-    while work {
+    loop {
         let mut i: usize = 0;
         for opt in options {
             if let Err(e) = term.write_line(&format!("{}. {}", i + 1, opt)) {
@@ -66,9 +67,34 @@ pub fn question_with_options<T: std::fmt::Display>(
         }
         let ans = res_ans_int.unwrap();
         if ans >= 1 || ans <= options.len() {
-            work = false;
             return Ok(ans - 1);
         }
     }
-    return Err(EmuError::Terminal("Unreachable statement".to_owned()));
+}
+
+pub fn get_list_data_files(dirname: &str) -> Result<(Vec<PathBuf>, Vec<PathBuf>), EmuError> {
+    let dir = PathBuf::from(dirname);
+    if !dir.is_dir() {
+        return Err(EmuError::DirNotFound(dir));
+    }
+    let mut vof = vec![];
+    let mut vfda = vec![];
+    for entry in std::fs::read_dir(dir)? {
+        if let Err(e) = entry {
+            return Err(EmuError::IO(e.to_string()));
+        }
+        let entry = entry?;
+        let ep = entry.path();
+        if ep.is_dir() {
+            continue;
+        }
+        let file_name = entry.file_name();
+        let file_name = file_name.to_str().unwrap_or("");
+        if file_name.starts_with("of_") {
+            vof.push(ep);
+        } else if file_name.starts_with("fda_") {
+            vfda.push(ep);
+        }
+    }
+    Ok((vof, vfda))
 }

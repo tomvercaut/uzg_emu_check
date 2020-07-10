@@ -1,6 +1,7 @@
 use crate::errors::EmuError;
 use crate::ipol::interpolate_linear;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OFTable {
@@ -125,6 +126,99 @@ impl OFTable {
         }
         Ok(interpolate_linear(ssd, x0, x1, y0, y1))
     }
+}
+
+pub fn read_of_table(path_buf: PathBuf) -> Result<(String, String, OFTable), EmuError> {
+    let mut of_table = OFTable::new();
+    let mut machine = "".to_owned();
+    let mut applicator = "".to_owned();
+    let res_rdr = csv::ReaderBuilder::new().has_headers(false).from_path(path_buf);
+    if let Err(e) = res_rdr {
+        return Err(EmuError::IO(e.to_string()));
+    }
+    let mut rdr = res_rdr.unwrap();
+    let mut nc = 0;
+    let mut i = 0;
+    for record in rdr.records() {
+        if let Err(e) = record {
+            return Err(EmuError::Format(e.to_string()));
+        }
+        let record = record.unwrap();
+        let nrecord = record.len();
+        if nrecord == 0 {
+            continue;
+        }
+        if nc == 0 {
+            nc = record.len();
+        }
+        if nc != nrecord {
+            return Err(EmuError::Format(format!(
+                "All rows in the CSV file must have the same number of columns [{} <-> {}]",
+                nc, nrecord
+            )));
+        }
+        if i == 0 {
+            machine = record[0].to_string();
+        } else if i == 1 {
+            if &record[0] != "Applicator" {
+                return Err(EmuError::Format(
+                "Expected the label \'Applicator\' on row 1, column 0".to_owned(),
+                ));
+            }
+            applicator = record[1].to_string();
+        } else if i == 2 {
+            if &record[0] != "Energy" {
+                return Err(EmuError::Format(
+                "Expected the label \'Energy\' on row 2, column 0".to_owned(),
+                ));
+            }
+            let mut energies = Vec::with_capacity(nrecord - 1);
+            for j in 1..nrecord {
+                let s = &record[j];
+                let res_f = s.parse::<f64>();
+                if let Err(e) = res_f {
+                    return Err(EmuError::Format(e.to_string()));
+                }
+                energies.push(res_f.unwrap());
+            }
+            of_table.energies = energies;
+        } else if i == 3 {
+            if &record[0] != "SSD/Zref" {
+                return Err(EmuError::Format(
+                    "Expected the label \'SSD/Zref\' on row 3, column 0".to_owned(),
+                ));
+            }
+            let mut zrefs = Vec::with_capacity(nrecord - 1);
+            for j in 1..nrecord {
+                let s = &record[j];
+                let res_f = s.parse::<f64>();
+                if let Err(e) = res_f {
+                    return Err(EmuError::Format(e.to_string()));
+                }
+                zrefs.push(res_f.unwrap());
+            }
+            of_table.zrefs = zrefs;
+        } else {
+            println!("record[0] = {}", &record[0]);
+            let ssd = (&record[0]).parse::<f64>();
+            if let Err(e) = ssd {
+                return Err(EmuError::Format(e.to_string()));
+            }
+            let ssd = ssd.unwrap();
+            let mut vof = Vec::with_capacity(nrecord - 1);
+            for j in 1..nrecord {
+                let s = &record[j];
+                let res_f = s.parse::<f64>();
+                if let Err(e) = res_f {
+                    return Err(EmuError::Format(e.to_string()));
+                }
+                vof.push(res_f.unwrap());
+            }
+            of_table.add_output_factor_per_ssd(ssd, vof)?;
+        }
+        i = i + 1;
+    }
+    Ok((machine, applicator, of_table))
 }
 
 #[cfg(test)]
