@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct CorrectionData {
     pub machine: String,
     pub applicator: String,
-    output_factors: OFTable,
-    fda: FdaTable,
+    pub output_factors: OFTable,
+    pub fda: FdaTable,
 }
 
 impl CorrectionData {
@@ -28,6 +28,10 @@ impl CorrectionData {
 
     pub fn set_zrefs(&mut self, values: Vec<f64>) {
         self.output_factors.set_zrefs(values);
+    }
+
+    pub fn validate(&self) -> bool {
+        self.output_factors.get_energies() == self.fda.get_energies()
     }
 
     pub fn add_output_factor_per_ssd(&mut self, ssd: f64, ofs: Vec<f64>) -> Result<(), EmuError> {

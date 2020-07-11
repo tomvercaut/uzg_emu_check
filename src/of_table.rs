@@ -26,6 +26,10 @@ impl OFTable {
         self.energies = values;
     }
 
+    pub fn get_energies(&self) -> &Vec<f64> {
+        &self.energies
+    }
+
     pub fn set_zrefs(&mut self, values: Vec<f64>) {
         self.zrefs = values;
     }
@@ -132,7 +136,9 @@ pub fn read_of_table(path_buf: PathBuf) -> Result<(String, String, OFTable), Emu
     let mut of_table = OFTable::new();
     let mut machine = "".to_owned();
     let mut applicator = "".to_owned();
-    let res_rdr = csv::ReaderBuilder::new().has_headers(false).from_path(path_buf);
+    let res_rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(path_buf);
     if let Err(e) = res_rdr {
         return Err(EmuError::IO(e.to_string()));
     }
@@ -162,14 +168,14 @@ pub fn read_of_table(path_buf: PathBuf) -> Result<(String, String, OFTable), Emu
         } else if i == 1 {
             if &record[0] != "Applicator" {
                 return Err(EmuError::Format(
-                "Expected the label \'Applicator\' on row 1, column 0".to_owned(),
+                    "Expected the label \'Applicator\' on row 1, column 0".to_owned(),
                 ));
             }
             applicator = record[1].to_string();
         } else if i == 2 {
             if &record[0] != "Energy" {
                 return Err(EmuError::Format(
-                "Expected the label \'Energy\' on row 2, column 0".to_owned(),
+                    "Expected the label \'Energy\' on row 2, column 0".to_owned(),
                 ));
             }
             let mut energies = Vec::with_capacity(nrecord - 1);

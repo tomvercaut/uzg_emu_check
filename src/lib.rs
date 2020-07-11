@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 mod correction_data;
+pub use correction_data::*;
 mod errors;
 pub use errors::*;
 mod fda_table;

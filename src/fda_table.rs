@@ -25,6 +25,10 @@ impl FdaTable {
         self.energies = values;
     }
 
+    pub fn get_energies(&self) -> &Vec<f64> {
+        &self.energies
+    }
+
     pub fn add(&mut self, name: &str, id: usize, corrections: Vec<f64>) -> Result<(), EmuError> {
         let n = self.energies.len();
         if n != corrections.len() {
@@ -104,7 +108,9 @@ pub fn read_fda_table(path_buf: PathBuf) -> Result<(String, String, FdaTable), E
     let mut fda_table = FdaTable::new();
     let mut machine = "".to_owned();
     let mut applicator = "".to_owned();
-    let res_rdr = csv::ReaderBuilder::new().has_headers(false).from_path(path_buf);
+    let res_rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(path_buf);
     if let Err(e) = res_rdr {
         return Err(EmuError::IO(e.to_string()));
     }
@@ -124,21 +130,30 @@ pub fn read_fda_table(path_buf: PathBuf) -> Result<(String, String, FdaTable), E
             nc = nrecord;
         }
         if nc != nrecord {
-            return Err(EmuError::Format(format!("All rows in the CSV file must have the same number of columns [{} <-> {}]", nc, nrecord)));
+            return Err(EmuError::Format(format!(
+                "All rows in the CSV file must have the same number of columns [{} <-> {}]",
+                nc, nrecord
+            )));
         }
         if i == 0 {
             machine = record[0].to_string();
         } else if i == 1 {
             if &record[0] != "Applicator" {
-                return Err(EmuError::Format("Expected the label \'Applicator\' on row 1, column 0".to_owned()));
+                return Err(EmuError::Format(
+                    "Expected the label \'Applicator\' on row 1, column 0".to_owned(),
+                ));
             }
             applicator = record[1].to_string();
         } else if i == 2 {
             if &record[0] != "Dimensions" {
-                return Err(EmuError::Format("Expected the label \'Dimensions\' on row 2, column 0".to_owned()));
+                return Err(EmuError::Format(
+                    "Expected the label \'Dimensions\' on row 2, column 0".to_owned(),
+                ));
             }
             if &record[1] != "id" {
-                return Err(EmuError::Format("Expected the label \'id\' on row 2, column 1".to_owned()));
+                return Err(EmuError::Format(
+                    "Expected the label \'id\' on row 2, column 1".to_owned(),
+                ));
             }
             let mut energies = Vec::with_capacity(nrecord - 1);
             for j in 1..nrecord {
@@ -150,8 +165,7 @@ pub fn read_fda_table(path_buf: PathBuf) -> Result<(String, String, FdaTable), E
                 energies.push(res_f.unwrap());
             }
             fda_table.energies = energies;
-        }
-        else {
+        } else {
             let name = &record[0];
             let sid = &record[1];
             let res_id = sid.parse::<usize>();
@@ -162,14 +176,14 @@ pub fn read_fda_table(path_buf: PathBuf) -> Result<(String, String, FdaTable), E
             for j in 2..nrecord {
                 let s = &record[j];
                 let res_f = s.parse::<f64>();
-                if let Err(e) = res_f{
+                if let Err(e) = res_f {
                     return Err(EmuError::Format(e.to_string()));
                 }
                 v.push(res_f.unwrap());
             }
             fda_table.add(name, res_id.unwrap(), v)?;
         }
-        i = i +1;
+        i = i + 1;
     }
     Ok((machine, applicator, fda_table))
 }

@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 use clap::{crate_authors, crate_description, crate_version, App, Arg};
 use console::Term;
-use emu_check::{get_list_data_files, read_of_table, EmuError, read_fda_table};
+use emu_check::{get_list_data_files, read_fda_table, read_of_table, CorrectionData, EmuError, question_with_options};
 use log::error;
 use std::process::exit;
 use std::sync::mpsc;
@@ -47,6 +47,14 @@ fn main() {
     let nvof = vof.len();
     let nvfda = vfda.len();
 
+    if nvof != nvfda {
+        error!(
+            "Number of files with output factors must be identical to the number of files \
+        with field defining apertures."
+        );
+        exit(1);
+    }
+
     // Collect the result on the receiver end
     let mut vof_tables = Vec::with_capacity(nvof);
     let mut vfda_tables = Vec::with_capacity(nvfda);
@@ -84,7 +92,10 @@ fn main() {
             // capture the transmitter
             let res_fda_table = read_fda_table(tpb);
             if let Err(e) = res_fda_table {
-                error!("Unable to read field defining aperture table: {}", e.to_string());
+                error!(
+                    "Unable to read field defining aperture table: {}",
+                    e.to_string()
+                );
                 exit(1);
             }
             let fda_table = res_fda_table.unwrap();
@@ -96,7 +107,7 @@ fn main() {
     }
 
     for _ in 0..nvof {
-       let res = rx_of.recv();
+        let res = rx_of.recv();
         if let Err(e) = res {
             error!("Channel receiver caught an error: {}", e.to_string());
             exit(1);
@@ -111,5 +122,63 @@ fn main() {
             exit(1);
         }
         vfda_tables.push(res.unwrap());
+    }
+
+    let mut vcd = vec![];
+    for i in 0..nvof {
+        let mut cd = CorrectionData::new();
+        {
+            let (machine, applicator, of_table) = vof_tables.get(i).unwrap();
+            cd.machine = machine.clone();
+            cd.applicator = applicator.clone();
+            cd.output_factors = of_table.clone();
+        }
+        for j in 0..nvfda {
+            let (machine, applicator, fda_table) = vfda_tables.get(j).unwrap();
+            if *machine == cd.machine
+                && *applicator == cd.applicator
+                && fda_table.get_energies() == cd.output_factors.get_energies()
+            {
+                cd.fda = fda_table.clone();
+            }
+        }
+        if !cd.validate() {
+            error!(
+                "Mismatch between the energies in the output factor \
+                table and the field defining aperture table."
+            );
+            exit(1);
+        }
+        vcd.push(cd);
+    }
+
+    if vcd.is_empty() {
+        error!("No configuration data was loaded.");
+        exit(1);
+    }
+
+    // Check if multiple machines are present
+    let term = Term::stdout();
+    let mut machine = "".to_string();
+    let mut machines = vec![];
+    for cd in &vcd {
+       if !machines.contains(&cd.machine) { machines.push(cd.machine.clone());}
+    }
+    let nmachines = machines.len();
+    if nmachines == 0 {
+        error!("No machines found in the correction data.");
+        exit(1);
+    } else if nmachines == 1 {
+        machine = machines.get(0).unwrap().clone();
+    } else if nmachines > 1 {
+        let res_idx = question_with_options(&term, "Select a machine", &machines);
+        if let Err(e) = res_idx {
+            error!("{}", e.to_string());
+            exit(1);
+        }
+        machine = machines.get(res_idx.unwrap()).unwrap().clone();
+    }
+    for cd in &mut vcd {
+
     }
 }
