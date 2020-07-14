@@ -10,6 +10,7 @@ pub enum EmuError {
     FdaIDNotFound(usize),
     ApplicatorNotFound(String),
     OFTableNotFound,
+    CorrectionDataNotFound(String, String),
     Terminal(String),
     Logic(String),
     Str(String),
@@ -29,6 +30,11 @@ impl std::fmt::Display for EmuError {
                 write!(f, "Applicator [{}] not found", &applicator)
             }
             EmuError::OFTableNotFound => write!(f, "OFTable not found"),
+            EmuError::CorrectionDataNotFound(machine, applicator) => write!(
+                f,
+                "Correction data not found [machine: {}, applicator: {}]",
+                machine, applicator
+            ),
             EmuError::Terminal(msg) => write!(f, "Terminal registered an error: {}", msg),
             EmuError::Logic(msg) => write!(f, "{}", msg),
             EmuError::Str(msg) => write!(f, "{}", msg),

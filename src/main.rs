@@ -1,7 +1,10 @@
 #![allow(unused_imports)]
 use clap::{crate_authors, crate_description, crate_version, App, Arg};
 use console::Term;
-use emu_check::{get_list_data_files, read_fda_table, read_of_table, CorrectionData, EmuError, question_with_options};
+use emu_check::{
+    get_calc_param_input_interactive, get_list_data_files, question_with_options, read_fda_table,
+    read_of_table, CalcParam, CorrectionData, EmuError,
+};
 use log::error;
 use std::process::exit;
 use std::sync::mpsc;
@@ -157,28 +160,9 @@ fn main() {
         exit(1);
     }
 
-    // Check if multiple machines are present
-    let term = Term::stdout();
-    let mut machine = "".to_string();
-    let mut machines = vec![];
-    for cd in &vcd {
-       if !machines.contains(&cd.machine) { machines.push(cd.machine.clone());}
-    }
-    let nmachines = machines.len();
-    if nmachines == 0 {
-        error!("No machines found in the correction data.");
+    let res_calc_data = get_calc_param_input_interactive(&vcd);
+    if let Err(e) = res_calc_data {
+        error!("Error while getting input user: {}", e.to_string());
         exit(1);
-    } else if nmachines == 1 {
-        machine = machines.get(0).unwrap().clone();
-    } else if nmachines > 1 {
-        let res_idx = question_with_options(&term, "Select a machine", &machines);
-        if let Err(e) = res_idx {
-            error!("{}", e.to_string());
-            exit(1);
-        }
-        machine = machines.get(res_idx.unwrap()).unwrap().clone();
-    }
-    for cd in &mut vcd {
-
     }
 }
