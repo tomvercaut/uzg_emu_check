@@ -102,14 +102,15 @@ pub fn get_list_data_files(dirname: &str) -> Result<(Vec<PathBuf>, Vec<PathBuf>)
     Ok((vof, vfda))
 }
 
+/// Obtain the calculation parameters by interactively asking the user for input.
+/// Return these parameters and the selected correction data based on those parameters.
 pub fn get_calc_param_input_interactive(
     vcd: &Vec<CorrectionData>,
-) -> Result<(CalcParam, CorrectionData), EmuError> {
+) -> Result<(CalcParam, &CorrectionData), EmuError> {
     let mut calc_param = CalcParam::new();
     // Check if multiple machines are present
     let term = Term::stdout();
     let mut machines = vec![];
-    let mut vfcd = vcd.clone();
     for cd in vcd {
         if !machines.contains(&cd.machine) {
             machines.push(cd.machine.clone());
@@ -120,11 +121,7 @@ pub fn get_calc_param_input_interactive(
         return Err(EmuError::Str(
             "No machines found in the correction data.".to_owned(),
         ));
-    }
-    // else if nmachines == 1 {
-    //     machine = machines.get(0).unwrap().clone();
-    // }
-    else {
+    } else {
         let idx = question_with_options(&term, "Select a machine", &machines)?;
         calc_param.machine = machines.get(idx).unwrap().clone();
     }
@@ -146,10 +143,7 @@ pub fn get_calc_param_input_interactive(
         calc_param.applicator = vapp.get(idx).unwrap().clone();
     }
 
-    // Filter correction data by machine
-    // vfcd.retain(|cd| cd.machine == calc_param.machine && cd.applicator == calc_param.applicator);
-
-    // Now only one should remain in the vector
+    // After filtering by machine and applicator only one match should be found in the vector.
     let nvcd = vcd.len();
     let mut idx = nvcd.clone();
     for i in 0..nvcd {
@@ -178,34 +172,63 @@ pub fn get_calc_param_input_interactive(
 
     // Get user selected energy
     let mut venergy = vec![];
-    for energy in &cd.output_factors.energies {
-            if !venergy.contains(energy) {
-                venergy.push(*energy);
-            }
+    let mut vzref = vec![];
+    let nenergy = cd.output_factors.energies.len();
+    for i in 0..nenergy {
+        let energy = cd.output_factors.energies.get(i).unwrap();
+        if !venergy.contains(energy) {
+            venergy.push(*energy);
+            vzref.push(*cd.output_factors.zrefs.get(i).unwrap());
         }
+    }
     let nve = venergy.len();
-    let mut energy = std::f64::MIN;
     if nve == 0 {
         return Err(EmuError::Str(
             "No energy found in the filtered correction data".to_owned(),
         ));
     } else {
-        let idx = question_with_options(&term, "Select energy: ", &venergy)?;
-        energy = venergy.get(idx).unwrap().clone();
+        let idx = question_with_options(&term, "Select energy", &venergy)?;
+        calc_param.energy = venergy.get(idx).unwrap().clone();
+        calc_param.depth_zref = vzref.get(idx).unwrap().clone();
     }
-    if !venergy.contains(&energy) {
+    if !venergy.contains(&calc_param.energy) {
         return Err(EmuError::Str("No valid energy was selected".to_owned()));
     }
 
     // Get fda_id
     let mut vfda = vec![];
     let nfda = cd.fda.ids.len();
-    if cd.fda.names.len() != nfda {
-
+    for i in 0..nfda {
+        let name = cd.fda.names.get(i).unwrap();
+        let id = cd.fda.ids.get(i).unwrap();
+        vfda.push(format!("{} [id={}]", name, id));
+    }
+    if vfda.is_empty() {
+        return Err(EmuError::Str(
+            "No FDA IDs found in filtered correction data".to_owned(),
+        ));
+    } else {
+        let idx = question_with_options(&term, "Select FDA", &vfda)?;
+        calc_param.fda_id = *cd.fda.ids.get(idx).unwrap();
     }
 
     // Get source to skin distance
-    let ssd: f64 = question_parse_res(&term, "SSD")?;
+    calc_param.ssd = question_parse_res(&term, "SSD")?;
 
-    unimplemented!()
+    // Get the dose at depth zref
+    calc_param.dose_zref = question_parse_res(
+        &term,
+        &*format!("Dose (cGy) [zref: {} mm]", calc_param.depth_zref),
+    )?;
+
+    // Get the planned MUs in the plan for the beam that's being verified.
+    calc_param.plan_mu = question_parse_res(&term, "Planned beam MUs")?;
+
+    Ok((calc_param, cd))
+}
+
+
+pub fn calculate_mu(calc_param: &CalcParam, cd: &CorrectionData) -> Result<f64, EmuError> {
+    let f = cd.get_correction_factor(calc_param.energy, calc_param.ssd, calc_param.fda_id)?;
+    Ok(calc_param.dose_zref/f)
 }

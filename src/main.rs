@@ -1,10 +1,7 @@
 #![allow(unused_imports)]
 use clap::{crate_authors, crate_description, crate_version, App, Arg};
 use console::Term;
-use emu_check::{
-    get_calc_param_input_interactive, get_list_data_files, question_with_options, read_fda_table,
-    read_of_table, CalcParam, CorrectionData, EmuError,
-};
+use emu_check::{get_calc_param_input_interactive, get_list_data_files, question_with_options, read_fda_table, read_of_table, CalcParam, CorrectionData, EmuError, calculate_mu};
 use log::error;
 use std::process::exit;
 use std::sync::mpsc;
@@ -163,6 +160,13 @@ fn main() {
     let res_calc_data = get_calc_param_input_interactive(&vcd);
     if let Err(e) = res_calc_data {
         error!("Error while getting input user: {}", e.to_string());
+        exit(1);
+    }
+
+    let (calc_param, cd) = res_calc_data.unwrap();
+    let res_mu = calculate_mu(&calc_param, cd);
+    if let Err(e) = res_mu {
+        error!("Error while calculating the MU's: {}", e);
         exit(1);
     }
 }

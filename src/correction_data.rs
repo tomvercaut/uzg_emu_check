@@ -47,6 +47,7 @@ impl CorrectionData {
         self.fda.add(name, id, corrections)
     }
 
+    /// Compute the total correction factor: CF_OF * CF_fda
     pub fn get_correction_factor(
         &self,
         energy: f64,
