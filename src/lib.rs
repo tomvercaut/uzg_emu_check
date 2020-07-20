@@ -103,11 +103,15 @@ pub fn get_list_data_files(dirname: &str) -> Result<(Vec<PathBuf>, Vec<PathBuf>)
 }
 
 /// Obtain the calculation parameters by interactively asking the user for input.
+/// The commandline questions are only asked if the corresponding input parameter doesn't contain
+/// the data.
 /// Return these parameters and the selected correction data based on those parameters.
-pub fn get_calc_param_input_interactive(
-    vcd: &Vec<CorrectionData>,
-) -> Result<(CalcParam, &CorrectionData), EmuError> {
+pub fn get_calc_param_input_cli<'a, 'b, 'c>(
+    vcd: &'a Vec<CorrectionData>,
+    opt_input_params: &'b Option<&'c CalcParam>,
+) -> Result<(CalcParam, &'a CorrectionData), EmuError> {
     let mut calc_param = CalcParam::new();
+    let has_opt_input_param = opt_input_params.is_some();
     // Check if multiple machines are present
     let term = Term::stdout();
     let mut machines = vec![];
@@ -122,8 +126,12 @@ pub fn get_calc_param_input_interactive(
             "No machines found in the correction data.".to_owned(),
         ));
     } else {
-        let idx = question_with_options(&term, "Select a machine", &machines)?;
-        calc_param.machine = machines.get(idx).unwrap().clone();
+        if has_opt_input_param && opt_input_params.unwrap().has_machine() {
+            calc_param.machine = opt_input_params.unwrap().machine.clone();
+        } else {
+            let idx = question_with_options(&term, "Select a machine", &machines)?;
+            calc_param.machine = machines.get(idx).unwrap().clone();
+        }
     }
 
     // Get applicator
@@ -139,8 +147,12 @@ pub fn get_calc_param_input_interactive(
             "No applicators found in the correction data.".to_owned(),
         ));
     } else {
-        let idx = question_with_options(&term, "Select applicator", &vapp)?;
-        calc_param.applicator = vapp.get(idx).unwrap().clone();
+        if has_opt_input_param && opt_input_params.unwrap().has_applicator() {
+            calc_param.applicator = opt_input_params.unwrap().applicator.clone();
+        } else {
+            let idx = question_with_options(&term, "Select applicator", &vapp)?;
+            calc_param.applicator = vapp.get(idx).unwrap().clone();
+        }
     }
 
     // After filtering by machine and applicator only one match should be found in the vector.
@@ -187,9 +199,18 @@ pub fn get_calc_param_input_interactive(
             "No energy found in the filtered correction data".to_owned(),
         ));
     } else {
-        let idx = question_with_options(&term, "Select energy", &venergy)?;
-        calc_param.energy = venergy.get(idx).unwrap().clone();
-        calc_param.depth_zref = vzref.get(idx).unwrap().clone();
+        if has_opt_input_param
+            && opt_input_params.unwrap().has_energy()
+            && opt_input_params.unwrap().has_depth_zref()
+        {
+            let tinput_param = opt_input_params.unwrap();
+            calc_param.energy = tinput_param.energy;
+            calc_param.depth_zref = tinput_param.depth_zref;
+        } else {
+            let idx = question_with_options(&term, "Select energy", &venergy)?;
+            calc_param.energy = venergy.get(idx).unwrap().clone();
+            calc_param.depth_zref = vzref.get(idx).unwrap().clone();
+        }
     }
     if !venergy.contains(&calc_param.energy) {
         return Err(EmuError::Str("No valid energy was selected".to_owned()));
@@ -208,27 +229,42 @@ pub fn get_calc_param_input_interactive(
             "No FDA IDs found in filtered correction data".to_owned(),
         ));
     } else {
-        let idx = question_with_options(&term, "Select FDA", &vfda)?;
-        calc_param.fda_id = *cd.fda.ids.get(idx).unwrap();
+        if opt_input_params.is_some() && opt_input_params.unwrap().has_fda_id() {
+            calc_param.fda_id = opt_input_params.unwrap().fda_id;
+        } else {
+            let idx = question_with_options(&term, "Select FDA", &vfda)?;
+            calc_param.fda_id = *cd.fda.ids.get(idx).unwrap();
+        }
     }
 
-    // Get source to skin distance
-    calc_param.ssd = question_parse_res(&term, "SSD")?;
+    if has_opt_input_param && opt_input_params.unwrap().has_ssd() {
+        calc_param.ssd = opt_input_params.unwrap().ssd;
+    } else {
+        // Get source to skin distance
+        calc_param.ssd = question_parse_res(&term, "SSD [cm]")?;
+    }
 
-    // Get the dose at depth zref
-    calc_param.dose_zref = question_parse_res(
-        &term,
-        &*format!("Dose (cGy) [zref: {} mm]", calc_param.depth_zref),
-    )?;
+    if has_opt_input_param && opt_input_params.unwrap().has_dose_zref() {
+        calc_param.dose_zref = opt_input_params.unwrap().dose_zref;
+    } else {
+        // Get the dose at depth zref
+        calc_param.dose_zref = question_parse_res(
+            &term,
+            &*format!("Dose (cGy) [zref: {} cm]", calc_param.depth_zref),
+        )?;
+    }
 
-    // Get the planned MUs in the plan for the beam that's being verified.
-    calc_param.plan_mu = question_parse_res(&term, "Planned beam MUs")?;
+    if has_opt_input_param && opt_input_params.unwrap().has_planned_beam_mu() {
+        calc_param.planned_beam_mu = opt_input_params.unwrap().planned_beam_mu;
+    } else {
+        // Get the planned MUs in the plan for the beam that's being verified.
+        calc_param.planned_beam_mu = question_parse_res(&term, "Planned beam MUs")?;
+    }
 
     Ok((calc_param, cd))
 }
 
-
 pub fn calculate_mu(calc_param: &CalcParam, cd: &CorrectionData) -> Result<f64, EmuError> {
     let f = cd.get_correction_factor(calc_param.energy, calc_param.ssd, calc_param.fda_id)?;
-    Ok(calc_param.dose_zref/f)
+    Ok(calc_param.dose_zref / f)
 }

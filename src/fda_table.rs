@@ -156,7 +156,7 @@ pub fn read_fda_table(path_buf: PathBuf) -> Result<(String, String, FdaTable), E
                 ));
             }
             let mut energies = Vec::with_capacity(nrecord - 1);
-            for j in 1..nrecord {
+            for j in 2..nrecord {
                 let s = &record[j];
                 let res_f = s.parse::<f64>();
                 if let Err(e) = res_f {

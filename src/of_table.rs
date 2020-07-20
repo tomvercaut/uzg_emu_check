@@ -205,7 +205,6 @@ pub fn read_of_table(path_buf: PathBuf) -> Result<(String, String, OFTable), Emu
             }
             of_table.zrefs = zrefs;
         } else {
-            println!("record[0] = {}", &record[0]);
             let ssd = (&record[0]).parse::<f64>();
             if let Err(e) = ssd {
                 return Err(EmuError::Format(e.to_string()));
