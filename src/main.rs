@@ -1,16 +1,17 @@
 #![allow(unused_imports)]
 use async_std::prelude::*;
+use async_std::task;
 use clap::{crate_authors, crate_description, crate_version, App, Arg};
 use console::Term;
-use emu_check::{calculate_mu, get_calc_param_input_cli, get_list_data_files, question_with_options, read_fda_table, read_of_table, CalcParam, CorrectionData, EmuError, load_data};
-use log::error;
+use emu_check::{load_data_calc_mu, EmuError};
+use log::{error, trace, Level};
 use std::process::exit;
 use std::sync::mpsc;
 use std::thread;
 
 #[async_std::main]
-fn main() {
-    simple_logger::init().unwrap();
+async fn main() {
+    simple_logger::init_with_level(Level::Info).unwrap();
     println!("EMU check");
     println!("---------");
     let opt_dir_default = dirs::data_local_dir();
@@ -39,26 +40,18 @@ fn main() {
         )
         .get_matches();
     let dirname = matches.value_of("dir").unwrap();
-    println!("dirname: {}", dirname);
+    trace!("dirname: {}", dirname);
 
-    let res_data = load_data(dirname).await;
-    if let Err(e) = res_data {
-        error!("Error was detected while loading the configuration data: {}", e.to_string());
+    let res = task::block_on(load_data_calc_mu(dirname, None));
+    if let Err(e) = res {
+        error!("Something went wrong:\n{}", e.to_string());
         exit(1);
     }
-
-    let vcd = res_data.unwrap();
-
-    let res_calc_data = get_calc_param_input_cli(&vcd, &None);
-    if let Err(e) = res_calc_data {
-        error!("Error while getting input user: {}", e.to_string());
-        exit(1);
-    }
-
-    let (calc_param, cd) = res_calc_data.unwrap();
-    let res_mu = calculate_mu(&calc_param, cd);
-    if let Err(e) = res_mu {
-        error!("Error while calculating the MU's: {}", e);
-        exit(1);
-    }
+    let (mu, calc_param) = res.unwrap();
+    let proc_diff = (1.0 - (calc_param.planned_beam_mu / mu)) * 100.0;
+    let s = format!(
+        "Calculation parameters:\n{}\nMU(check): {:.4}\nDifference[%]: {:.6}",
+        calc_param, mu, proc_diff
+    );
+    println!("{}", s);
 }

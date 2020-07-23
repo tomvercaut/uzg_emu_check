@@ -58,3 +58,17 @@ impl CalcParam {
         self.fda_id != std::usize::MAX
     }
 }
+
+impl Default for CalcParam {
+    fn default() -> Self {
+        CalcParam::new()
+    }
+}
+
+impl std::fmt::Display for CalcParam {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Machine: {}\nApplicator: {}\nEnergy(MeV): {}\nSSD[cm]: {}\nZref(depth[cm]): {}\nZref(dose[cGy]): {}\nFDA ID: {}\nMU(plan): {}\n",
+        self.machine, self.applicator, self.energy, self.ssd, self.depth_zref, self.dose_zref, self.fda_id, self.planned_beam_mu
+        )
+    }
+}

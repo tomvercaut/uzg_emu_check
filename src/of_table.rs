@@ -77,7 +77,7 @@ impl OFTable {
         // find matching energy
         let mut energy_idx = self.energies.len();
         for idx in 0..self.energies.len() {
-            if energy == *self.energies.get(idx).unwrap() {
+            if (energy - *self.energies.get(idx).unwrap()).abs() < std::f64::EPSILON {
                 energy_idx = idx;
                 break;
             }
@@ -129,6 +129,12 @@ impl OFTable {
             return Err(EmuError::SSDNotFound(ssd));
         }
         Ok(interpolate_linear(ssd, x0, x1, y0, y1))
+    }
+}
+
+impl Default for OFTable {
+    fn default() -> Self {
+        OFTable::new()
     }
 }
 
@@ -221,7 +227,7 @@ pub fn read_of_table(path_buf: PathBuf) -> Result<(String, String, OFTable), Emu
             }
             of_table.add_output_factor_per_ssd(ssd, vof)?;
         }
-        i = i + 1;
+        i += 1;
     }
     Ok((machine, applicator, of_table))
 }

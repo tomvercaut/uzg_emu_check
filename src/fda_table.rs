@@ -64,7 +64,7 @@ impl FdaTable {
         let nenergies = self.energies.len();
         let mut energy_idx = nenergies;
         for idx in 0..nenergies {
-            if energy == *self.energies.get(idx).unwrap() {
+            if (energy - *self.energies.get(idx).unwrap()).abs() < std::f64::EPSILON {
                 energy_idx = idx;
                 break;
             }
@@ -101,6 +101,12 @@ impl FdaTable {
         }
         let cf = opt_cf.unwrap();
         Ok(*cf)
+    }
+}
+
+impl Default for FdaTable {
+    fn default() -> Self {
+        FdaTable::new()
     }
 }
 
@@ -183,7 +189,7 @@ pub fn read_fda_table(path_buf: PathBuf) -> Result<(String, String, FdaTable), E
             }
             fda_table.add(name, res_id.unwrap(), v)?;
         }
-        i = i + 1;
+        i += 1;
     }
     Ok((machine, applicator, fda_table))
 }

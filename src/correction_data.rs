@@ -65,6 +65,12 @@ impl CorrectionData {
     }
 }
 
+impl Default for CorrectionData {
+    fn default() -> Self {
+        CorrectionData::new()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
