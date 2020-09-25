@@ -116,16 +116,16 @@ pub fn read_fda_table(path_buf: PathBuf) -> Result<(String, String, FdaTable), E
     let mut applicator = "".to_owned();
     let res_rdr = csv::ReaderBuilder::new()
         .has_headers(false)
-        .from_path(path_buf);
+        .from_path(path_buf.clone());
     if let Err(e) = res_rdr {
-        return Err(EmuError::IO(e.to_string()));
+        return Err(EmuError::IO(format!("{:#?}: {}", path_buf, e.to_string())));
     }
     let mut rdr = res_rdr.unwrap();
     let mut nc = 0;
     let mut i = 0;
     for record in rdr.records() {
         if let Err(e) = record {
-            return Err(EmuError::IO(e.to_string()));
+            return Err(EmuError::IO(format!("{:#?}: {}", path_buf, e.to_string())));
         }
         let record = record.unwrap();
         let nrecord = record.len();

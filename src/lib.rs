@@ -7,6 +7,8 @@ mod errors;
 pub use errors::*;
 mod fda_table;
 pub use fda_table::*;
+mod correction_data_set;
+pub use correction_data_set::*;
 mod ipol;
 mod of_table;
 pub use of_table::*;
@@ -53,7 +55,7 @@ fn question_with_options<T: std::fmt::Display>(
         if let Err(e) = term.write_line(&format!("{}: ", msg)) {
             return Err(EmuError::Terminal(e.to_string()));
         }
-        for (i,opt) in options.iter().enumerate() {
+        for (i, opt) in options.iter().enumerate() {
             if let Err(e) = term.write_line(&format!("{}. {}", i + 1, opt)) {
                 return Err(EmuError::Terminal(e.to_string()));
             }
@@ -77,32 +79,32 @@ fn question_with_options<T: std::fmt::Display>(
     }
 }
 
-fn get_list_data_files(dirname: &str) -> Result<(Vec<PathBuf>, Vec<PathBuf>), EmuError> {
-    let dir = PathBuf::from(dirname);
-    if !dir.is_dir() {
-        return Err(EmuError::DirNotFound(dir));
-    }
-    let mut vof = vec![];
-    let mut vfda = vec![];
-    for entry in std::fs::read_dir(dir)? {
-        if let Err(e) = entry {
-            return Err(EmuError::IO(e.to_string()));
-        }
-        let entry = entry?;
-        let ep = entry.path();
-        if ep.is_dir() {
-            continue;
-        }
-        let file_name = entry.file_name();
-        let file_name = file_name.to_str().unwrap_or("");
-        if file_name.starts_with("of_") {
-            vof.push(ep);
-        } else if file_name.starts_with("fda_") {
-            vfda.push(ep);
-        }
-    }
-    Ok((vof, vfda))
-}
+// fn get_list_data_files(dirname: &str) -> Result<(Vec<PathBuf>, Vec<PathBuf>), EmuError> {
+//     let dir = PathBuf::from(dirname);
+//     if !dir.is_dir() {
+//         return Err(EmuError::DirNotFound(dir));
+//     }
+//     let mut vof = vec![];
+//     let mut vfda = vec![];
+//     for entry in std::fs::read_dir(dir)? {
+//         if let Err(e) = entry {
+//             return Err(EmuError::IO(e.to_string()));
+//         }
+//         let entry = entry?;
+//         let ep = entry.path();
+//         if ep.is_dir() {
+//             continue;
+//         }
+//         let file_name = entry.file_name();
+//         let file_name = file_name.to_str().unwrap_or("");
+//         if file_name.starts_with("of_") {
+//             vof.push(ep);
+//         } else if file_name.starts_with("fda_") {
+//             vfda.push(ep);
+//         }
+//     }
+//     Ok((vof, vfda))
+// }
 
 /// Obtain the calculation parameters by interactively asking the user for input.
 /// The commandline questions are only asked if the corresponding input parameter doesn't contain
@@ -285,82 +287,82 @@ pub fn calculate_mu(calc_param: &CalcParam, cd: &CorrectionData) -> Result<f64, 
     Ok(calc_param.dose_zref / f)
 }
 
-/// Load the configuration data (outputfactors and field defining apertures)
-/// and process the data into a vector of CorrectionData.
-pub async fn load_data(dirname: &str) -> Result<Vec<CorrectionData>, EmuError> {
-    let (vof, vfda) = get_list_data_files(dirname)?;
-    let nvof = vof.len();
-    let nvfda = vfda.len();
-
-    if nvof != nvfda {
-        return Err(EmuError::Logic("Number of files with output factors must be identical to the number of files with field defining apertures.".to_owned()
-        ));
-    }
-
-    // Collect the result on the receiver end
-    let mut vof_tables = Vec::with_capacity(nvof);
-    let mut vfda_tables = Vec::with_capacity(nvfda);
-
-    let mut thandles_of = vec![];
-    let mut thandles_fda = vec![];
-
-    // Spawn a bunch of tasks to read the outputfactor files one by one.
-    // Each task returns a handle to a future result containing the data.
-    // This allows the result and or it's errors to be passed so it can be
-    // proccessed accordingly.
-    for pb in vof {
-        let tpb = pb.clone();
-        thandles_of.push(task::spawn(async move { read_of_table(tpb) }));
-    }
-
-    for pb in vfda {
-        let tpb = pb.clone();
-        thandles_fda.push(task::spawn(async move { read_fda_table(tpb) }));
-    }
-
-    // The for loop takes ownership and waits for the result
-    // before pushing it in the vector.
-    for handle in thandles_of {
-        vof_tables.push(handle.await?);
-    }
-    for handle in thandles_fda {
-        vfda_tables.push(handle.await?);
-    }
-
-    let mut vcd = vec![];
-    for i in 0..nvof {
-        let mut cd = CorrectionData::new();
-        {
-            let (machine, applicator, of_table) = vof_tables.get(i).unwrap();
-            cd.machine = machine.clone();
-            cd.applicator = applicator.clone();
-            cd.output_factors = of_table.clone();
-        }
-        for j in 0..nvfda {
-            let (machine, applicator, fda_table) = vfda_tables.get(j).unwrap();
-            if *machine == cd.machine
-                && *applicator == cd.applicator
-                && fda_table.get_energies() == cd.output_factors.get_energies()
-            {
-                cd.fda = fda_table.clone();
-            }
-        }
-        if !cd.validate() {
-            return Err(EmuError::Logic(
-                "Mismatch between the energies in the output factor \
-                            table and the field defining aperture table."
-                    .to_owned(),
-            ));
-        }
-        vcd.push(cd);
-    }
-
-    if vcd.is_empty() {
-        return Err(EmuError::IO("No configuration data was loaded.".to_owned()));
-    }
-
-    Ok(vcd)
-}
+// /// Load the configuration data (outputfactors and field defining apertures)
+// /// and process the data into a vector of CorrectionData.
+// pub async fn load_data(dirname: &str) -> Result<Vec<CorrectionData>, EmuError> {
+//     let (vof, vfda) = get_list_data_files(dirname)?;
+//     let nvof = vof.len();
+//     let nvfda = vfda.len();
+//
+//     if nvof != nvfda {
+//         return Err(EmuError::Logic("Number of files with output factors must be identical to the number of files with field defining apertures.".to_owned()
+//         ));
+//     }
+//
+//     // Collect the result on the receiver end
+//     let mut vof_tables = Vec::with_capacity(nvof);
+//     let mut vfda_tables = Vec::with_capacity(nvfda);
+//
+//     let mut thandles_of = vec![];
+//     let mut thandles_fda = vec![];
+//
+//     // Spawn a bunch of tasks to read the outputfactor files one by one.
+//     // Each task returns a handle to a future result containing the data.
+//     // This allows the result and or it's errors to be passed so it can be
+//     // proccessed accordingly.
+//     for pb in vof {
+//         let tpb = pb.clone();
+//         thandles_of.push(task::spawn(async move { read_of_table(tpb) }));
+//     }
+//
+//     for pb in vfda {
+//         let tpb = pb.clone();
+//         thandles_fda.push(task::spawn(async move { read_fda_table(tpb) }));
+//     }
+//
+//     // The for loop takes ownership and waits for the result
+//     // before pushing it in the vector.
+//     for handle in thandles_of {
+//         vof_tables.push(handle.await?);
+//     }
+//     for handle in thandles_fda {
+//         vfda_tables.push(handle.await?);
+//     }
+//
+//     let mut vcd = vec![];
+//     for i in 0..nvof {
+//         let mut cd = CorrectionData::new();
+//         {
+//             let (machine, applicator, of_table) = vof_tables.get(i).unwrap();
+//             cd.machine = machine.clone();
+//             cd.applicator = applicator.clone();
+//             cd.output_factors = of_table.clone();
+//         }
+//         for j in 0..nvfda {
+//             let (machine, applicator, fda_table) = vfda_tables.get(j).unwrap();
+//             if *machine == cd.machine
+//                 && *applicator == cd.applicator
+//                 && fda_table.get_energies() == cd.output_factors.get_energies()
+//             {
+//                 cd.fda = fda_table.clone();
+//             }
+//         }
+//         if !cd.validate() {
+//             return Err(EmuError::Logic(
+//                 "Mismatch between the energies in the output factor \
+//                             table and the field defining aperture table."
+//                     .to_owned(),
+//             ));
+//         }
+//         vcd.push(cd);
+//     }
+//
+//     if vcd.is_empty() {
+//         return Err(EmuError::IO("No configuration data was loaded.".to_owned()));
+//     }
+//
+//     Ok(vcd)
+// }
 
 pub async fn load_data_calc_mu(
     dirname: &str,
