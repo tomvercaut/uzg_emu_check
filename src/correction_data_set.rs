@@ -36,7 +36,7 @@ impl CorrectionDataSet {
                 v.push(cd.machine.clone());
             }
         }
-        return v;
+        v
     }
 
     pub fn get_energies(&self, machine: &str) -> Vec<f64> {
@@ -50,19 +50,20 @@ impl CorrectionDataSet {
                 }
             }
         }
-        return v;
+        v
     }
 
     pub fn get_applicators(&self, machine: &str, energy: f64) -> Vec<String> {
         let mut v = vec![];
         for cd in &self.data {
-            if cd.machine.as_str() == machine && cd.get_energies_as_ref().contains(&energy) {
-                if !v.contains(&cd.applicator) {
-                    v.push(cd.applicator.clone());
-                }
+            if cd.machine.as_str() == machine
+                && cd.get_energies_as_ref().contains(&energy)
+                && !v.contains(&cd.applicator)
+            {
+                v.push(cd.applicator.clone());
             }
         }
-        return v;
+        v
     }
 
     pub fn get_applicator_fitments(
@@ -84,7 +85,7 @@ impl CorrectionDataSet {
                 }
             }
         }
-        return v;
+        v
     }
 }
 

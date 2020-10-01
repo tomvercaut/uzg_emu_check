@@ -3,8 +3,10 @@ name = "emu_check"
 version = "0.1.0"
 authors = ["Tom <tomvercaut@gmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT or Apache-2.0"
+description = "Library and commandline application to check the calculated MUs of an electron beam used in radiotherapy treatment planning."
+keywords = ["electron", "radiotherapy", "radiation therapy"]
+categories = ["asynchronous", "command-line-utilities", "science"]
 
 [dependencies]
 clap = "2.33.1"
