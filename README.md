@@ -1,6 +1,5 @@
 # emu_check
-
-![Travis (.org) branch](https://img.shields.io/travis/tomvercaut/uzg_emu_check/async_impl?style=flat-square)
+![Travis (.org) branch](https://img.shields.io/travis/tomvercaut/uzg_emu_check/master?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 
