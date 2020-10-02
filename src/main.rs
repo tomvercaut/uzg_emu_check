@@ -4,14 +4,15 @@ use async_std::task;
 use clap::{crate_authors, crate_description, crate_version, App, Arg};
 use console::Term;
 use emu_check::{load_data_calc_mu, EmuError};
-use log::{error, trace, Level};
+use log::{error, trace, LevelFilter};
 use std::process::exit;
 use std::sync::mpsc;
 use std::thread;
+use simple_logger::SimpleLogger;
 
 #[async_std::main]
 async fn main() {
-    simple_logger::init_with_level(Level::Info).unwrap();
+    SimpleLogger::new().with_level(LevelFilter::Info).init().unwrap();
     println!("EMU check");
     println!("---------");
     let opt_dir_default = dirs::data_local_dir();

@@ -1,6 +1,11 @@
 # emu_check
 
-Library and commandline application to check the calculated MUs of an electron beam used in radiotherapy treatment planning.
+![Travis (.org) branch](https://img.shields.io/travis/tomvercaut/uzg_emu_check/async_impl?style=flat-square)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+
+
+Library and command line application to check the calculated MUs of an electron beam used in radiotherapy treatment planning.
 
 ## Description
 The project was created to eliminate the manual calculations performed during the MU verification of an electron beam treatment plan. The applied method is unlikely to fit the requirements for your radiotherapy site and should not be considered as a general tool to verify electron treatment plans.
