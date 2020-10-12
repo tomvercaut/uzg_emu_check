@@ -258,7 +258,6 @@ pub fn calculate_mu(calc_param: &CalcParam, cd: &CorrectionData) -> Result<f64, 
     Ok(calc_param.dose_zref / f)
 }
 
-
 pub async fn load_data_calc_mu(
     dirname: &str,
     opt_input_params: Option<&CalcParam>,

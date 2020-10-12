@@ -87,7 +87,42 @@ impl CorrectionDataSet {
         }
         v
     }
+
+    // Get zref in function of the machine, applicator and energy.
+    pub fn get_zref<S: AsRef<str> + ?Sized>(
+        &self,
+        machine: &S,
+        applicator: &S,
+        energy: &S,
+    ) -> Option<f64> {
+        if let Ok(energy_) = energy.as_ref().parse::<f64>() {
+            for cd in self.data.iter() {
+                if cd.machine.as_str() == machine.as_ref()
+                    && cd.get_energies().contains(&energy_)
+                    && cd.applicator.as_str() == applicator.as_ref()
+                {
+                    return cd.get_zref(energy_);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn calc<S: AsRef<str> + ?Sized>(
+        machine: &S,
+        applicator: &S,
+        applicator_fitment: &S,
+        energy: &S,
+        ssd: &S,
+        planned_beam_mu: &S,
+        dose_zref: &S
+    ) {
+        //
+    }
 }
+
+#[derive(Debug, Clone)]
+pub struct Computed {}
 
 /// Load the configuration data (outputfactors and field defining apertures)
 /// and process the data into a CorrectionDataSet.

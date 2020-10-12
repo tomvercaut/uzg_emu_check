@@ -71,6 +71,16 @@ impl CorrectionData {
     pub fn get_energies_as_ref(&self) -> &Vec<f64> {
         &self.output_factors.energies
     }
+
+    // Get the zref depth in function of the energy.
+    pub fn get_zref(&self, energy: f64) -> Option<f64> {
+        for (e, zr) in self.output_factors.energies.iter().zip(self.output_factors.zrefs.iter()) {
+            if *e == energy {
+                return Some(*zr);
+            }
+        }
+        None
+    }
 }
 
 impl Default for CorrectionData {
